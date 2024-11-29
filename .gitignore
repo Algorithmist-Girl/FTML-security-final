@@ -1,0 +1,8 @@
+data/
+
+ftml_final_env/
+# .env/
+# *.env
+*.pyc
+
+.DS_Store
