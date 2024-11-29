@@ -240,7 +240,8 @@ def main():
             nb_tr_examples, nb_tr_steps = 0, 0
             eval_loss, eval_accuracy = 0, 0
             nb_eval_steps, nb_eval_examples = 0, 0
-            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+            # for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+            for step, batch in enumerate(train_dataloader):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, input_labels = batch 
                 logits = model.input_to_logit(input_ids)
@@ -303,8 +304,8 @@ def main():
 
                 loss_fn = torch.nn.CrossEntropyLoss()
 
-                for input_ids, input_mask, labels in tqdm(test_dataloader, desc="Evaluating"):
-                        
+                # for input_ids, input_mask, labels in tqdm(test_dataloader, desc="Evaluating"):
+                for input_ids, input_mask, labels in (test_dataloader):
                     input_ids = input_ids.to(device)
                     input_mask = input_mask.to(device)
                     labels = labels.to(device)            
