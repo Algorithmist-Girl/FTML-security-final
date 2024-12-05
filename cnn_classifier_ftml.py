@@ -134,12 +134,12 @@ def triplet_loss(experiment1, experiment2, experiment3, xs, dist_mat, embeddings
         negtive = embeddings[non_synonyms] # [1, k_n, d]
         # neg_mask = torch.ne(non_synonyms, xs.unsqueeze(-1)).float() # [b*n, k_n] filter where negtive sample is the anchor
   
-    print('\npositive.shape: ', positive.shape)
-    print('negative.shape: ', negtive.shape)
+    # print('\npositive.shape: ', positive.shape)
+    # print('negative.shape: ', negtive.shape)
 
-    print('(number of inputs) xs shape: ', xs.shape)
+    # print('(number of inputs) xs shape: ', xs.shape)
     # print('(getting embeddings) anchor.shape: ', anchor.shape)
-    print('(comparing it to the 8 synonyms per each input) anchor.unsqueeze(1).shape: ', anchor.unsqueeze(1).shape)
+    # print('(comparing it to the 8 synonyms per each input) anchor.unsqueeze(1).shape: ', anchor.unsqueeze(1).shape)
     syn_dis = torch.linalg.norm(anchor.unsqueeze(1) - positive, dim=-1, ord=2) * pos_mask
     nonsyn_dis = torch.linalg.norm(anchor.unsqueeze(1) - negtive, dim=-1, ord=2)
 
