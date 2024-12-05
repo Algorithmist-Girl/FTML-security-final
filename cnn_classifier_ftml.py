@@ -410,8 +410,8 @@ def main():
             nb_eval_steps, nb_eval_examples = 0, 0
             model.train()
 
-            # for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-            for step, batch in enumerate(train_dataloader):
+            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+            # for step, batch in enumerate(train_dataloader):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, input_labels = batch
 
