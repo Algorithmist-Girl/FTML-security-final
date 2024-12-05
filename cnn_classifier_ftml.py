@@ -6,7 +6,9 @@ import logging
 import os
 import random
 import sys
+import copy
 import pickle
+from sklearn.cluster import KMeans
 
 import numpy as np
 import torch
@@ -21,14 +23,84 @@ from cnn_utils import *
 
 
 def find_synonym(xs, dist_mat, threshold=0.5):
+    # print('xs: ', len(xs))
+    # print('second: ', dist_mat[:, :, 1][xs])
     synonyms = dist_mat[:, :, 0][xs]
     synonyms_dist = dist_mat[:, :, 1][xs]
     synonyms = torch.where(synonyms_dist <= threshold, synonyms, torch.zeros_like(synonyms))
     synonyms = torch.where(synonyms >= 0, synonyms, torch.zeros_like(synonyms)) # [None, Sequence_len, Syn_num]
+    # print('testing first: ', synonyms[0])
     return synonyms 
 
+def create_set_of_synonyms(synonyms):
+    # each row = a word and columns = synonyms for that word. so 8 synonyms
+    # being selected for each of the words
+    # corresponding to experiment 1
+    unique_synonym_ids = set()
+    for curr_synonyms_per_word in synonyms:
+        unique_synonym_ids.update(list(curr_synonyms_per_word.tolist()))
+    # unique_synonym_ids = torch.tensor(unique_synonym_ids)
+    unique_synonym_ids = torch.tensor(list(unique_synonym_ids))
+    return unique_synonym_ids
 
-def triplet_loss(xs, dist_mat, embeddings, device, vocab_size, nb_negtive=8, margin=6.0):
+def get_candidates_for_non_synonyms(synonyms, vocab_size):
+    all_ids = np.arange(1, vocab_size)
+    exclude_ids = synonyms.numpy(force=True)
+    candidates_for_nonsynonyms = np.setdiff1d(all_ids, exclude_ids)
+    return candidates_for_nonsynonyms
+  
+def get_non_synonyms(candidate_ids_for_nonsynonyms, nb_negative):
+    non_synonyms = np.random.choice(candidate_ids_for_nonsynonyms, nb_negative, replace=False)
+    non_synonyms = torch.tensor(non_synonyms, dtype=torch.long)
+    return non_synonyms
+
+def cluster_all_embeddings_in_vocab(entire_vocab_embeddings, nb_negative):
+    # want to select a word from each cluster, that is not in the synonym set 
+    entire_vocab_embeddings_converted = entire_vocab_embeddings.numpy(force=True)
+    kmeans = KMeans(n_clusters=nb_negative, random_state=0, n_init="auto").fit(entire_vocab_embeddings_converted)
+    return kmeans
+
+def get_non_synonyms_from_clusters_experiment_2(clustered_embeddings, device, nb_negtive):
+    cluster_centers = clustered_embeddings.cluster_centers_
+    # print(type(cluster_centers))
+    cluster_centers = np.reshape(cluster_centers, (1, nb_negtive, len(cluster_centers[0])))
+    cluster_centers = torch.tensor(cluster_centers, dtype=torch.long).to(device).detach()
+    # print(cluster_centers.shape)
+    return cluster_centers
+
+def get_embedding_ids_per_cluster(clustered_embeddings, vocab_size):
+    res_ids_for_non_synonyms = []
+    all_labels = clustered_embeddings.labels_
+    all_point_ids = np.arange(1, vocab_size)
+
+    # print(type(all_labels[0]))
+    unique_cluster_ids = list(set(all_labels))
+    ids_for_all_clusters = []
+    for curr_cluster_id in unique_cluster_ids:
+        points_for_curr_cluster = np.array([])
+        for ind, curr_point_id in enumerate(all_point_ids):
+            if all_labels[ind] == curr_cluster_id:
+                 points_for_curr_cluster  = np.append(points_for_curr_cluster, curr_point_id)
+                    
+        ids_for_all_clusters.append(points_for_curr_cluster)
+    
+    return ids_for_all_clusters
+        
+
+def get_nonsynonyms_experiment_3(synonym_ids, ids_for_all_clusters, device):
+    copy_synonym_ids = copy.deepcopy(synonym_ids)
+    copy_synonym_ids = copy_synonym_ids.numpy(force=True)
+
+    res_ids_for_non_synonyms = np.array([])
+    for ids_for_curr_cluster in ids_for_all_clusters:
+        # print(ids_for_curr_cluster.shape)
+        ids_for_curr_cluster = np.setdiff1d(ids_for_curr_cluster, copy_synonym_ids )
+        selection_for_curr_cluster = torch.tensor(np.random.choice(ids_for_curr_cluster, 1, replace=False), dtype=torch.float).to(device).detach()
+        res_ids_for_non_synonyms = np.append(res_ids_for_non_synonyms, selection_for_curr_cluster.numpy(force=True))
+    res_ids_for_non_synonyms = torch.tensor(res_ids_for_non_synonyms, dtype=torch.long).to(device).detach()
+    return res_ids_for_non_synonyms
+
+def triplet_loss(experiment1, experiment2, experiment3, xs, dist_mat, embeddings, device, vocab_size, clustered_embeddings, ids_per_cluster, nb_negtive=8, margin=6.0):
 
     mask = xs.ne(0.0)
     xs = torch.masked_select(xs, mask)
@@ -39,11 +111,35 @@ def triplet_loss(xs, dist_mat, embeddings, device, vocab_size, nb_negtive=8, mar
     positive = embeddings[synonyms] # [b*n, k, d]
     pos_mask = torch.ge(synonyms, 1).float() # [b*n, k] filter where synonym is [UNK]
 
-    non_synonyms = torch.randint(low=1, high=vocab_size, size=(nb_negtive,), dtype=torch.long).to(device).detach()
-    non_synonyms = non_synonyms.unsqueeze(0) # [1, k_n]
-    negtive = embeddings[non_synonyms] # [1, k_n, d]
-    neg_mask = torch.ne(non_synonyms, xs.unsqueeze(-1)).float() # [b*n, k_n] filter where negtive sample is the anchor
+    # print('synonyms.shape: ', synonyms.shape)
+    if experiment1:
+        # unique_synonyms = create_set_of_synonyms(synonyms)
+        possible_non_synonym_candidates = get_candidates_for_non_synonyms(synonyms, vocab_size)
+        non_synonyms =  get_non_synonyms(possible_non_synonym_candidates, nb_negtive).to(device).detach()
+        non_synonyms = non_synonyms.unsqueeze(0) # [1, k_n]
+        negtive = embeddings[non_synonyms] # [1, k_n, d]
+        # neg_mask = torch.ne(non_synonyms, xs.unsqueeze(-1)).float() # [b*n, k_n] filter where negtive sample is the anchor
+    elif experiment2:
+        negtive = get_non_synonyms_from_clusters_experiment_2(clustered_embeddings, device, nb_negtive)
+    elif experiment3:
+        # non_synonyms = get_embedding_ids_per_cluster(synonyms, clustered_embeddings, vocab_size, device)
+        non_synonyms = get_nonsynonyms_experiment_3(synonyms, ids_per_cluster, device)
+        negtive = embeddings[non_synonyms]
+        first, second = negtive.shape
+        negtive =  torch.reshape(negtive, (1, first, second))
+        # negtive = get_non_synonyms_from_clusters_experiment_3(clustered_embeddings, device, nb_negtive)
+    else:
+        non_synonyms = torch.randint(low=1, high=vocab_size, size=(nb_negtive,), dtype=torch.long).to(device).detach()
+        non_synonyms = non_synonyms.unsqueeze(0) # [1, k_n]
+        negtive = embeddings[non_synonyms] # [1, k_n, d]
+        # neg_mask = torch.ne(non_synonyms, xs.unsqueeze(-1)).float() # [b*n, k_n] filter where negtive sample is the anchor
+  
+    print('\npositive.shape: ', positive.shape)
+    print('negative.shape: ', negtive.shape)
 
+    print('(number of inputs) xs shape: ', xs.shape)
+    # print('(getting embeddings) anchor.shape: ', anchor.shape)
+    print('(comparing it to the 8 synonyms per each input) anchor.unsqueeze(1).shape: ', anchor.unsqueeze(1).shape)
     syn_dis = torch.linalg.norm(anchor.unsqueeze(1) - positive, dim=-1, ord=2) * pos_mask
     nonsyn_dis = torch.linalg.norm(anchor.unsqueeze(1) - negtive, dim=-1, ord=2)
 
@@ -162,7 +258,15 @@ def main():
                         default=6.0,
                         type=float,
                         help="hyperparameter for triplet loss.")
-
+    parser.add_argument("--experiment1",
+                        action='store_true',
+                        help="Whether not to activate experiment 1")
+    parser.add_argument("--experiment2",
+                        action='store_true',
+                        help="Whether not to activate experiment 2")
+    parser.add_argument("--experiment3",
+                        action='store_true',
+                        help="Whether not to activate experiment 2")
     parser.add_argument("--no_cuda",
                         action='store_true',
                         help="Whether not to use CUDA when available")
@@ -180,7 +284,11 @@ def main():
                         help="Number of updates steps to accumulate before performing a backward/update pass.")
     parser.add_argument('--vGPU', type=str, default='0', help="Specify which GPUs to use.")
     args = parser.parse_args()
-    
+
+    experiment1 = args.experiment1
+    experiment2 = args.experiment2
+    experiment3 = args.experiment3
+
     if args.vGPU:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.vGPU
 
@@ -233,9 +341,11 @@ def main():
         # Prepare data
         vocab, _ = load_dictionary(task_name, args.vocab_size, data_dir=args.data_dir)
         dist_mat = load_dist_mat(task_name, args.vocab_size, data_dir=args.data_dir)
+        print('\n\n\nthe dist mat at time of loading in the main: ', dist_mat.shape)
         for stop_word in stop_words:
             if stop_word in vocab:
                 dist_mat[vocab[stop_word], :, :] = 0
+        dist_mat = dist_mat.astype(np.float32)
         dist_mat = torch.tensor(dist_mat[:, :args.max_candidates, :]).to(device)
 
         train_data, test_data = load_dataset(args, vocab)
@@ -311,8 +421,19 @@ def main():
                 clean_loss = loss_fn(logits, input_labels)
 
                 embeddings = model.get_embeddings()
+                # for experiment 2 below
+                all_ids = torch.arange(start=1, end=len(vocab), dtype=torch.long).to(device).detach()
+                all_embeddings = embeddings[all_ids]
+                clustered_embeddings = cluster_all_embeddings_in_vocab(all_embeddings, args.nb_negtive)
+                # for experiment 3 below
+                ids_per_cluster = get_embedding_ids_per_cluster(clustered_embeddings, len(vocab))
+                # print('ids_per_cluster: ', ids_per_cluster)
+                # print(len(ids_per_cluster))
+                # print('all embeddings shape: ',  all_embeddings.shape)
+                # print(type(clustered_embeddings))
+                # for experiment 2 above
 
-                sa, syn_dis, non_syndis = triplet_loss(input_ids, dist_mat, embeddings, device, len(vocab), args.nb_negtive, args.alpha)
+                sa, syn_dis, non_syndis = triplet_loss(experiment1, experiment2, experiment3, input_ids, dist_mat, embeddings, device, len(vocab), clustered_embeddings, ids_per_cluster, args.nb_negtive, args.alpha)
 
                 loss = clean_loss + args.beta * sa
 
