@@ -23,8 +23,7 @@ from cnn_utils import *
 
 
 def find_synonym(xs, dist_mat, threshold=0.5):
-    # print('xs: ', len(xs))
-    # print('second: ', dist_mat[:, :, 1][xs])
+    # print('len(xs): ', len(xs))
     synonyms = dist_mat[:, :, 0][xs]
     synonyms_dist = dist_mat[:, :, 1][xs]
     synonyms = torch.where(synonyms_dist <= threshold, synonyms, torch.zeros_like(synonyms))
@@ -33,8 +32,7 @@ def find_synonym(xs, dist_mat, threshold=0.5):
     return synonyms 
 
 def create_set_of_synonyms(synonyms):
-    # each row = a word and columns = synonyms for that word. so 8 synonyms
-    # being selected for each of the words
+    # each row = a word and columns = synonyms for that word so 8 synonyms
     # corresponding to experiment 1
     unique_synonym_ids = set()
     for curr_synonyms_per_word in synonyms:
@@ -93,7 +91,6 @@ def get_nonsynonyms_experiment_3(synonym_ids, ids_for_all_clusters, device):
 
     res_ids_for_non_synonyms = np.array([])
     for ids_for_curr_cluster in ids_for_all_clusters:
-        # print(ids_for_curr_cluster.shape)
         ids_for_curr_cluster = np.setdiff1d(ids_for_curr_cluster, copy_synonym_ids )
         selection_for_curr_cluster = torch.tensor(np.random.choice(ids_for_curr_cluster, 1, replace=False), dtype=torch.float).to(device).detach()
         res_ids_for_non_synonyms = np.append(res_ids_for_non_synonyms, selection_for_curr_cluster.numpy(force=True))
@@ -111,7 +108,6 @@ def triplet_loss(experiment1, experiment2, experiment3, xs, dist_mat, embeddings
     positive = embeddings[synonyms] # [b*n, k, d]
     pos_mask = torch.ge(synonyms, 1).float() # [b*n, k] filter where synonym is [UNK]
 
-    # print('synonyms.shape: ', synonyms.shape)
     if experiment1:
         # unique_synonyms = create_set_of_synonyms(synonyms)
         possible_non_synonym_candidates = get_candidates_for_non_synonyms(synonyms, vocab_size)
@@ -137,9 +133,6 @@ def triplet_loss(experiment1, experiment2, experiment3, xs, dist_mat, embeddings
     # print('\npositive.shape: ', positive.shape)
     # print('negative.shape: ', negtive.shape)
 
-    # print('(number of inputs) xs shape: ', xs.shape)
-    # print('(getting embeddings) anchor.shape: ', anchor.shape)
-    # print('(comparing it to the 8 synonyms per each input) anchor.unsqueeze(1).shape: ', anchor.unsqueeze(1).shape)
     syn_dis = torch.linalg.norm(anchor.unsqueeze(1) - positive, dim=-1, ord=2) * pos_mask
     nonsyn_dis = torch.linalg.norm(anchor.unsqueeze(1) - negtive, dim=-1, ord=2)
 
@@ -154,7 +147,6 @@ def load_dataset(args, vocab):
     filename = os.path.join(args.data_dir, "temp", "{}_for_cnn_train.data".format(args.task_name))
 
     if os.path.exists(filename):
-        print("load dataset from exist file.")
         f=open(filename,'rb')
         saved=pickle.load(f)
         f.close()
@@ -427,11 +419,6 @@ def main():
                 clustered_embeddings = cluster_all_embeddings_in_vocab(all_embeddings, args.nb_negtive)
                 # for experiment 3 below
                 ids_per_cluster = get_embedding_ids_per_cluster(clustered_embeddings, len(vocab))
-                # print('ids_per_cluster: ', ids_per_cluster)
-                # print(len(ids_per_cluster))
-                # print('all embeddings shape: ',  all_embeddings.shape)
-                # print(type(clustered_embeddings))
-                # for experiment 2 above
 
                 sa, syn_dis, non_syndis = triplet_loss(experiment1, experiment2, experiment3, input_ids, dist_mat, embeddings, device, len(vocab), clustered_embeddings, ids_per_cluster, args.nb_negtive, args.alpha)
 

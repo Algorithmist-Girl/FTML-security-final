@@ -32,7 +32,7 @@ def load_dataset(args):
     filename = os.path.join(args.data_dir, "temp", "{}_for_cnn_attack.data".format(args.task_name))
 
     if os.path.exists(filename):
-        print("load dataset from exist file.")
+        # print("load dataset from exist file.")
         f=open(filename,'rb')
         saved=pickle.load(f)
         f.close()
@@ -119,6 +119,12 @@ def main():
     parser.add_argument("--no_cuda",
                         action='store_true',
                         help="Whether not to use CUDA when available")
+    parser.add_argument("--experiment4",
+                        action='store_true',
+                        help="Whether to run experiment 4")
+    parser.add_argument("--experiment5",
+                        action='store_true',
+                        help="Whether to run experiment 5")
     parser.add_argument("--local_rank",
                         type=int,
                         default=-1,
@@ -185,7 +191,6 @@ def main():
 
     eval_accuracy = 0.0
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        print('entered eval part!!!')
         test_examples, test_labels = read_text("%s/test" % task_name, args.data_dir)
         test_seqs, test_seqs_mask = text_encoder(test_examples, vocab, args.max_seq_length)
         test_data = TensorDataset(torch.tensor(test_seqs, dtype=torch.long), \
@@ -245,8 +250,8 @@ def main():
         if args.attack == 'pwws':
             adversary = PWWSAdversary(synonym_selector, model)
         elif args.attack == 'ga':
-            print('starting the GA adversary!!!')
-            adversary = GAAdversary(synonym_selector, model, iterations_num=40, pop_max_size=60)
+            # print('starting the GA adversary!!!')
+            adversary = GAAdversary(args.experiment4, args.experiment5, synonym_selector, model, iterations_num=40, pop_max_size=60)
         elif args.attack == 'pso':
             adversary = PSOAdversary(synonym_selector, model, iterations_num=40, pop_max_size=60)
         elif args.attack == 'hla':
@@ -257,9 +262,7 @@ def main():
             label = sample_labels[i]
             adv_label = int(model.query([sentence], [label])[1][0])
             if adv_label == label:
-                print('starting the adversary run!!!')
                 success, adv_sentence, adv_label = adversary.run(sentence, label)
-                print('finished the adversary run!!!')
                 if success:
                     success_attack_count += 1
                 else:

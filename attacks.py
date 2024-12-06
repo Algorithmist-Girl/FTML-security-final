@@ -49,11 +49,13 @@ class Adversary(object):
 class GAAdversary(Adversary):
     """  GA attack method.  """
 
-    def __init__(self, synonym_selector, target_model, iterations_num=20, pop_max_size=60, max_perturbed_percent=0.25):
+    def __init__(self, experiment4, experiment5, synonym_selector, target_model, iterations_num=20, pop_max_size=60, max_perturbed_percent=0.25):
         super(GAAdversary, self).__init__(synonym_selector, target_model, max_perturbed_percent)
         self.max_iters = iterations_num
         self.pop_size = pop_max_size
         self.temp = 0.3
+        self.experiment4 = experiment4
+        self.experiment5 = experiment5
 
     def predict_batch(self, sentences): # Done
         seqs = [" ".join(words) for words in sentences]
@@ -105,6 +107,52 @@ class GAAdversary(Adversary):
                 x_new[i] = x2[i]
         return x_new
 
+    def crossover_experiment4(self, x1, x2, x3):
+        # 3 parent crossover
+        x_new = x1.copy()
+        for i in range(len(x1)):
+            if x1[i] == x2[i]:
+                x_new[i] = x1[i]
+            if x1[i] != x2[i]:
+                x_new[i] = x3[i]
+        return x_new
+    
+
+    # def crossover_experiment5(self, x1, x2):
+    #     initial_fixed = x1[20:45]
+    #     x_res = x1.copy()
+    #     x2 = list(np.setdiff1d(x2, initial_fixed)) 
+
+    #     curr_res_ptr = 0
+    #     curr_x2_ptr = 0
+    #     while True:
+    #         if curr_res_ptr == len(x1) - 1:
+    #             break
+    #         if curr_x2_ptr == len(x2) - 1:
+    #             break
+    #         if curr_res_ptr == 20: #jumping to the very end, skipping that part
+    #             curr_res_ptr = 45  
+    #         x_res[curr_res_ptr] = x2[curr_res_ptr]
+    #         curr_x2_ptr += 1
+
+
+    def crossover_experiment5(self, x1, x2):
+        # position based crossover 
+        x_res = x1.copy()
+        fixed_element_indices = np.random.choice(np.arange(0, len(x1)), 20) # randomly choosing 20 elements to keep 
+
+        index_from_x2 = 0
+        for i in range(0, len(x1)):
+            if i in fixed_element_indices:
+                continue 
+            elif index_from_x2 <= len(x2) - 1:
+                x_res[i] = x2[index_from_x2]
+                index_from_x2+=1
+            else:
+                x_res[i] = x1[i] #fixing some more elements because ran out of elements to take from x2
+        return x_res
+        
+    
     def check_return(self, perturbed_words, ori_words, ori_label):
         perturbed_text = " ".join(perturbed_words)
         clean_text = " ".join(ori_words)
@@ -140,6 +188,8 @@ class GAAdversary(Adversary):
 
         pop = self.generate_population(
             x_orig, neigbhours_list, w_select_probs, ori_label, self.pop_size)
+        # print('population length: ', len(pop))
+    
         for i in range(self.max_iters):
             pop_preds = self.predict_batch(pop)
             pop_scores = 1 - pop_preds[:, ori_label]
@@ -153,15 +203,50 @@ class GAAdversary(Adversary):
             if np.argmax(pop_preds[top_attack, :]) != ori_label:
                 return self.check_return(pop[top_attack], x_orig, ori_label)
             elite = [pop[top_attack]]  # elite
-            # print(select_probs.shape)
-            parent1_idx = np.random.choice(
-                self.pop_size, size=self.pop_size-1, p=select_probs)
-            parent2_idx = np.random.choice(
-                self.pop_size, size=self.pop_size-1, p=select_probs)
 
-            childs = [self.crossover(pop[parent1_idx[i]],
-                                     pop[parent2_idx[i]])
-                      for i in range(self.pop_size-1)]
+            # crossover portion 
+            # if self.experiment4 == True:
+            #     # ensuring that the parent indices don't repeat
+            #     parent1_idx = np.random.choice(
+            #         self.pop_size, size=self.pop_size-1, p=select_probs)
+            #     parent2_idx = np.random.choice(
+            #         self.pop_size, size=self.pop_size-1, p=select_probs)
+            # else:
+            # print('the population size: ', self.pop_size)
+
+            if self.experiment4:
+                parent1_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs)
+                parent2_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs)
+                parent3_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs)
+
+                childs = [self.crossover_experiment4(pop[parent1_idx[i]],
+                                    pop[parent2_idx[i]], pop[parent3_idx[i]])
+                    for i in range(self.pop_size-1)]
+            elif self.experiment5:
+                parent1_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs, replace=False)
+                parent2_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs, replace=False)
+                
+                childs = [self.crossover_experiment5(pop[parent1_idx[i]],
+                                    pop[parent2_idx[i]])
+                    for i in range(self.pop_size-1)]
+            else:
+                parent1_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs)
+                parent2_idx = np.random.choice(
+                    self.pop_size, size=self.pop_size-1, p=select_probs)
+                
+                childs = [self.crossover(pop[parent1_idx[i]],
+                                    pop[parent2_idx[i]])
+                    for i in range(self.pop_size-1)]
+            # print('type of popped parent: ', type(pop[parent1_idx[i]]))
+            # print('parent1 idx.shape: ', parent1_idx.shape)
+
+                
             childs = [self.perturb(
                 x, x_orig, neigbhours_list, w_select_probs, ori_label) for x in childs]
             pop = elite + childs
@@ -298,7 +383,6 @@ class PSOAdversary(Adversary):
         if np.sum(neighbours_len) == 0:
             return False, sentence, ori_label
 
-        # print(neighbours_len)
 
         tem = self.generate_population(x_orig, neigbhours_list, w_select_probs, ori_label, self.pop_size)
         if tem is None:

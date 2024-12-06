@@ -26,7 +26,6 @@ def load_dataset(args, vocab):
     filename = os.path.join(args.data_dir, "{}_for_cnn_train.data".format(args.task_name))
 
     if os.path.exists(filename):
-        print("load dataset from exist file.")
         f=open(filename,'rb')
         saved=pickle.load(f)
         f.close()
