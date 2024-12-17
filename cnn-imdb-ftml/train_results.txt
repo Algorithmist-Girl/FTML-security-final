@@ -1,0 +1,21 @@
+{'data_dir': './data/', 'task_name': 'imdb', 'model_type': 'CNNModel', 'output_dir': 'model/cnn-imdb-ftml', 'max_seq_length': 512, 'vocab_size': 50000, 'do_train': True, 'do_eval': True, 'freeze_emb': False, 'train_batch_size': 32, 'eval_batch_size': 128, 'learning_rate': 0.0005, 'num_train_epochs': 5.0, 'max_candidates': 8, 'beta': 1.0, 'nb_negtive': 8, 'alpha': 6.0, 'experiment1': True, 'experiment2': False, 'experiment3': False, 'no_cuda': False, 'local_rank': -1, 'seed': 42, 'gradient_accumulation_steps': 1, 'vGPU': '0'}
+epoch = 0
+train_accuracy = 0.82828
+train_loss = 1.9152949825881997
+
+epoch = 1
+train_accuracy = 0.87796
+train_loss = 0.9039361781781287
+
+epoch = 2
+train_accuracy = 0.90216
+train_loss = 0.5709317908110216
+
+epoch = 3
+train_accuracy = 0.9416
+train_loss = 0.4138247950759995
+
+epoch = 4
+train_accuracy = 0.94988
+train_loss = 0.38942373412496906
+

@@ -93,7 +93,6 @@ def load_pretrained_embedding(task_name, max_vocab_size, data_dir="./", pretrain
         data_dir
         + "aux_files/embeddings_%s_%s_%d.npy" % (pretraining_type, task_name, max_vocab_size)
     )
-    print("glove embedding matrix: ", glove_embedding_matrix.shape)
     return glove_embedding_matrix
 
 def text_encoder(texts, org_dic, maxlen):

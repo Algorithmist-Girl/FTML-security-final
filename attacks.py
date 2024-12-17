@@ -49,13 +49,13 @@ class Adversary(object):
 class GAAdversary(Adversary):
     """  GA attack method.  """
 
-    def __init__(self, experiment4, experiment5, synonym_selector, target_model, iterations_num=20, pop_max_size=60, max_perturbed_percent=0.25):
+    def __init__(self, experiment5, experiment6, synonym_selector, target_model, iterations_num=20, pop_max_size=60, max_perturbed_percent=0.25):
         super(GAAdversary, self).__init__(synonym_selector, target_model, max_perturbed_percent)
         self.max_iters = iterations_num
         self.pop_size = pop_max_size
         self.temp = 0.3
-        self.experiment4 = experiment4
         self.experiment5 = experiment5
+        self.experiment6 = experiment6
 
     def predict_batch(self, sentences): # Done
         seqs = [" ".join(words) for words in sentences]
@@ -107,7 +107,7 @@ class GAAdversary(Adversary):
                 x_new[i] = x2[i]
         return x_new
 
-    def crossover_experiment4(self, x1, x2, x3):
+    def crossover_experiment5(self, x1, x2, x3):
         # 3 parent crossover
         x_new = x1.copy()
         for i in range(len(x1)):
@@ -118,7 +118,7 @@ class GAAdversary(Adversary):
         return x_new
     
 
-    # def crossover_experiment5(self, x1, x2):
+    # def crossover_experiment6(self, x1, x2):
     #     initial_fixed = x1[20:45]
     #     x_res = x1.copy()
     #     x2 = list(np.setdiff1d(x2, initial_fixed)) 
@@ -136,7 +136,7 @@ class GAAdversary(Adversary):
     #         curr_x2_ptr += 1
 
 
-    def crossover_experiment5(self, x1, x2):
+    def crossover_experiment6(self, x1, x2):
         # position based crossover 
         x_res = x1.copy()
         fixed_element_indices = np.random.choice(np.arange(0, len(x1)), 20) # randomly choosing 20 elements to keep 
@@ -205,7 +205,7 @@ class GAAdversary(Adversary):
             elite = [pop[top_attack]]  # elite
 
             # crossover portion 
-            # if self.experiment4 == True:
+            # if self.experiment5 == True:
             #     # ensuring that the parent indices don't repeat
             #     parent1_idx = np.random.choice(
             #         self.pop_size, size=self.pop_size-1, p=select_probs)
@@ -214,7 +214,7 @@ class GAAdversary(Adversary):
             # else:
             # print('the population size: ', self.pop_size)
 
-            if self.experiment4:
+            if self.experiment5:
                 parent1_idx = np.random.choice(
                     self.pop_size, size=self.pop_size-1, p=select_probs)
                 parent2_idx = np.random.choice(
@@ -222,16 +222,16 @@ class GAAdversary(Adversary):
                 parent3_idx = np.random.choice(
                     self.pop_size, size=self.pop_size-1, p=select_probs)
 
-                childs = [self.crossover_experiment4(pop[parent1_idx[i]],
+                childs = [self.crossover_experiment5(pop[parent1_idx[i]],
                                     pop[parent2_idx[i]], pop[parent3_idx[i]])
                     for i in range(self.pop_size-1)]
-            elif self.experiment5:
+            elif self.experiment6:
                 parent1_idx = np.random.choice(
                     self.pop_size, size=self.pop_size-1, p=select_probs, replace=False)
                 parent2_idx = np.random.choice(
                     self.pop_size, size=self.pop_size-1, p=select_probs, replace=False)
                 
-                childs = [self.crossover_experiment5(pop[parent1_idx[i]],
+                childs = [self.crossover_experiment6(pop[parent1_idx[i]],
                                     pop[parent2_idx[i]])
                     for i in range(self.pop_size-1)]
             else:

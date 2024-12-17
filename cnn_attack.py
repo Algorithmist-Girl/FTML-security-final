@@ -119,12 +119,12 @@ def main():
     parser.add_argument("--no_cuda",
                         action='store_true',
                         help="Whether not to use CUDA when available")
-    parser.add_argument("--experiment4",
-                        action='store_true',
-                        help="Whether to run experiment 4")
     parser.add_argument("--experiment5",
                         action='store_true',
                         help="Whether to run experiment 5")
+    parser.add_argument("--experiment6",
+                        action='store_true',
+                        help="Whether to run experiment 6")
     parser.add_argument("--local_rank",
                         type=int,
                         default=-1,
@@ -251,7 +251,7 @@ def main():
             adversary = PWWSAdversary(synonym_selector, model)
         elif args.attack == 'ga':
             # print('starting the GA adversary!!!')
-            adversary = GAAdversary(args.experiment4, args.experiment5, synonym_selector, model, iterations_num=40, pop_max_size=60)
+            adversary = GAAdversary(args.experiment5, args.experiment6, synonym_selector, model, iterations_num=40, pop_max_size=60)
         elif args.attack == 'pso':
             adversary = PSOAdversary(synonym_selector, model, iterations_num=40, pop_max_size=60)
         elif args.attack == 'hla':
